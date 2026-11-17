@@ -346,49 +346,74 @@ data. Each database is a single <code>.duckdb</code> file hosted on
 Hugging Face. This package attaches those files over HTTP so that only
 the byte ranges your query touches are transferred, or downloads them
 once for local use.</p>
+<div id="install" class="section level2">
+<h2>Install</h2>
+<p>The released package is available on <a href="https://CRAN.R-project.org/package=datapond">CRAN</a>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;datapond&quot;</span>)</span></code></pre></div>
+<p>CRAN 0.1.0 was published September 27, 2026. This development
+vignette also describes the 0.1.1 resource controls, available from
+<code>pak::pak(&quot;datapond-db/datapond-r&quot;)</code> until the next CRAN
+release.</p>
+</div>
 <div id="browse" class="section level2">
 <h2>Browse</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(datapond)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">dp_list</span>()</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">dp_databases</span>()[, <span class="fu">c</span>(<span class="st">&quot;id&quot;</span>, <span class="st">&quot;rows&quot;</span>, <span class="st">&quot;size_gb&quot;</span>, <span class="st">&quot;data_date_range&quot;</span>)]</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="fu">dp_info</span>(<span class="st">&quot;eoir&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(datapond)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">dp_list</span>()</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">dp_databases</span>()[, <span class="fu">c</span>(<span class="st">&quot;id&quot;</span>, <span class="st">&quot;rows&quot;</span>, <span class="st">&quot;size_gb&quot;</span>, <span class="st">&quot;data_date_range&quot;</span>)]</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">dp_info</span>(<span class="st">&quot;eoir&quot;</span>)</span></code></pre></div>
 </div>
 <div id="query-remotely" class="section level2">
 <h2>Query remotely</h2>
 <p><code>dp_connect()</code> returns an ordinary DuckDB
 <code>DBIConnection</code>:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dp_connect</span>(<span class="st">&quot;eoir&quot;</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>DBI<span class="sc">::</span><span class="fu">dbGetQuery</span>(con, <span class="st">&quot;SELECT * FROM proceedings LIMIT 5&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dp_connect</span>(<span class="st">&quot;eoir&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>DBI<span class="sc">::</span><span class="fu">dbGetQuery</span>(con, <span class="st">&quot;SELECT * FROM proceedings LIMIT 5&quot;</span>)</span></code></pre></div>
+<p>For bounded queries in the development version, configure DuckDB
+before attachment:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">dp_disconnect</span>(con)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dp_connect</span>(<span class="st">&quot;eoir&quot;</span>, <span class="at">config =</span> <span class="fu">list</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">memory_limit =</span> <span class="st">&quot;1GB&quot;</span>, <span class="at">threads =</span> <span class="st">&quot;2&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">temp_directory =</span> <span class="fu">tempfile</span>(<span class="st">&quot;datapond-spill-&quot;</span>),</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">max_temp_directory_size =</span> <span class="st">&quot;2GB&quot;</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>))</span></code></pre></div>
+<p>The same list can be set with
+<code>options(datapond.duckdb_config = list(...))</code>. Leave headroom
+for R and the desktop: DuckDB’s memory limit is not a limit on the whole
+R process. Filter and aggregate before collecting data into R.</p>
 <p>Every database ships a data dictionary; <code>dp_describe()</code>
 reads it:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">dp_describe</span>(con)                         <span class="co"># tables</span></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">dp_describe</span>(con, <span class="at">table =</span> <span class="st">&quot;proceedings&quot;</span>)  <span class="co"># columns, types, null %, join hints</span></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">dp_describe</span>(con, <span class="at">search =</span> <span class="st">&quot;judge&quot;</span>)       <span class="co"># columns by name</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">dp_describe</span>(con)                         <span class="co"># tables</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">dp_describe</span>(con, <span class="at">table =</span> <span class="st">&quot;proceedings&quot;</span>)  <span class="co"># columns, types, null %, join hints</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">dp_describe</span>(con, <span class="at">search =</span> <span class="st">&quot;judge&quot;</span>)       <span class="co"># columns by name</span></span></code></pre></div>
 <p>dbplyr works unchanged:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">&quot;proceedings&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="fu">count</span>(DEC_CODE, <span class="at">sort =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">10</span>) <span class="sc">|&gt;</span></span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">dp_disconnect</span>(con)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">&quot;proceedings&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="fu">select</span>(DEC_CODE) <span class="sc">|&gt;</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">10</span>) <span class="sc">|&gt;</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">dp_disconnect</span>(con)</span></code></pre></div>
 </div>
 <div id="several-databases" class="section level2">
 <h2>Several databases</h2>
 <p>Pass a vector of ids. Tables are then qualified by database id, and
 ids that contain a hyphen must be double-quoted in SQL:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dp_connect</span>(<span class="fu">c</span>(<span class="st">&quot;cms-medicare&quot;</span>, <span class="st">&quot;openpayments&quot;</span>))</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>DBI<span class="sc">::</span><span class="fu">dbGetQuery</span>(con, <span class="st">&#39;SELECT * FROM &quot;cms-medicare&quot;.physician_summary LIMIT 5&#39;</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">I</span>(<span class="st">&#39;&quot;openpayments&quot;.main.general_payments&#39;</span>)) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">5</span>) <span class="sc">|&gt;</span> <span class="fu">collect</span>()</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">dp_disconnect</span>(con)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dp_connect</span>(<span class="fu">c</span>(<span class="st">&quot;cms-medicare&quot;</span>, <span class="st">&quot;openpayments&quot;</span>))</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>DBI<span class="sc">::</span><span class="fu">dbGetQuery</span>(con, <span class="st">&#39;SELECT * FROM &quot;cms-medicare&quot;.physician_summary LIMIT 5&#39;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">I</span>(<span class="st">&#39;&quot;openpayments&quot;.main.general_payments&#39;</span>)) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">5</span>) <span class="sc">|&gt;</span> <span class="fu">collect</span>()</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">dp_disconnect</span>(con)</span></code></pre></div>
 </div>
 <div id="local-copies" class="section level2">
 <h2>Local copies</h2>
-<p>Remote mode is cheap for counts and filters but <code>SELECT *</code>
-over a large table transfers most of the file. Download once for disk
-speed:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">dp_download</span>(<span class="st">&quot;dol-visas&quot;</span>)</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dp_connect</span>(<span class="st">&quot;dol-visas&quot;</span>, <span class="at">local =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">dp_update</span>(<span class="st">&quot;dol-visas&quot;</span>)   <span class="co"># re-download only if the registry is newer</span></span></code></pre></div>
+<p>Remote mode fetches metadata and data ranges over HTTP. Filters,
+views and joins can scan much of a file, even when the result is small.
+Download once for repeated disk reads:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">dp_download</span>(<span class="st">&quot;dol-visas&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dp_connect</span>(<span class="st">&quot;dol-visas&quot;</span>, <span class="at">local =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">dp_disconnect</span>(con)      <span class="co"># close the local file before replacing it</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">dp_update</span>(<span class="st">&quot;dol-visas&quot;</span>)   <span class="co"># compare with the published remote version</span></span></code></pre></div>
+<p>File size describes disk storage, not RAM. Allow room for the new
+file, temporary download bytes and any existing copy. Close connections
+to a local file before updating it, especially on Windows.</p>
 <p>Set <code>options(datapond.data_dir = &quot;~/.datapond&quot;)</code> to share
 downloads with the Python package.</p>
 </div>

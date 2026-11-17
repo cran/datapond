@@ -4,7 +4,12 @@
 \alias{dp_connect}
 \title{Connect to one or more datapond databases}
 \usage{
-dp_connect(id, local = FALSE, quiet = FALSE)
+dp_connect(
+  id,
+  local = FALSE,
+  quiet = FALSE,
+  config = getOption("datapond.duckdb_config", list())
+)
 }
 \arguments{
 \item{id}{One or more database ids (see \code{\link[=dp_list]{dp_list()}}).}
@@ -13,6 +18,16 @@ dp_connect(id, local = FALSE, quiet = FALSE)
 files?}
 
 \item{quiet}{Suppress progress messages?}
+
+\item{config}{Named list of DuckDB configuration values, passed to
+\code{\link[duckdb:duckdb]{duckdb::duckdb()}} before any database is attached. Defaults to
+\code{getOption("datapond.duckdb_config", list())}. Use \code{memory_limit},
+\code{threads}, \code{temp_directory}, and \code{max_temp_directory_size} to bound query
+resources. Values must be non-missing scalars and are converted to strings
+for DuckDB. DuckDB's memory limit does not include all R allocations.
+This argument was introduced in development version 0.1.1 and is not in
+CRAN 0.1.0. With CRAN 0.1.0, set query limits after connecting using
+\code{\link[DBI:dbExecute]{DBI::dbExecute()}}, or use a direct DuckDB connection for startup limits.}
 }
 \value{
 A \code{duckdb_connection} (a \code{DBIConnection}). Close it with
@@ -21,8 +36,9 @@ A \code{duckdb_connection} (a \code{DBIConnection}). Close it with
 \description{
 Opens an in-memory DuckDB connection and attaches each requested database
 read-only, either remotely from its \code{attach_url} (the default; DuckDB's
-\code{httpfs} extension fetches only the byte ranges a query touches, so there is
-no full download) or from a local copy made with \code{\link[=dp_download]{dp_download()}}.
+\code{httpfs} extension fetches byte ranges without requiring a full download
+first) or from a local copy made with \code{\link[=dp_download]{dp_download()}}. Large remote queries
+can still transfer much of a file.
 }
 \details{
 With a single \code{id} the database is made the default catalog (\code{USE}), so

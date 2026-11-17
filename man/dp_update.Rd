@@ -2,7 +2,7 @@
 % Please edit documentation in R/download.R
 \name{dp_update}
 \alias{dp_update}
-\title{Update a local database if the registry has a newer version}
+\title{Update a local database if the remote file has changed}
 \usage{
 dp_update(id, quiet = FALSE)
 }
@@ -15,6 +15,10 @@ dp_update(id, quiet = FALSE)
 The local path, invisibly.
 }
 \description{
-Compares the registry's \code{updated} date with the local file's modification
-time and re-downloads when the registry is newer.
+Compares the identity of the remote file (ETag, else Last-Modified, from a
+HEAD request) with the one recorded when the local copy was downloaded, and
+re-downloads when they differ or when the revision cannot be verified. Copies
+without a usable identity record are re-downloaded when update is requested;
+local modification times and registry dates cannot prove which bytes they
+contain. The registry is re-fetched first.
 }

@@ -7,8 +7,9 @@ attach_sql <- function(con, source, alias) {
 #'
 #' Opens an in-memory DuckDB connection and attaches each requested database
 #' read-only, either remotely from its `attach_url` (the default; DuckDB's
-#' `httpfs` extension fetches only the byte ranges a query touches, so there is
-#' no full download) or from a local copy made with [dp_download()].
+#' `httpfs` extension fetches byte ranges without requiring a full download
+#' first) or from a local copy made with [dp_download()]. Large remote queries
+#' can still transfer much of a file.
 #'
 #' With a single `id` the database is made the default catalog (`USE`), so
 #' tables can be referenced unqualified. With several ids, qualify tables with
@@ -19,6 +20,15 @@ attach_sql <- function(con, source, alias) {
 #' @param local Attach local copies under [dp_data_dir()] instead of remote
 #'   files?
 #' @param quiet Suppress progress messages?
+#' @param config Named list of DuckDB configuration values, passed to
+#'   [duckdb::duckdb()] before any database is attached. Defaults to
+#'   `getOption("datapond.duckdb_config", list())`. Use `memory_limit`,
+#'   `threads`, `temp_directory`, and `max_temp_directory_size` to bound query
+#'   resources. Values must be non-missing scalars and are converted to strings
+#'   for DuckDB. DuckDB's memory limit does not include all R allocations.
+#'   This argument was introduced in development version 0.1.1 and is not in
+#'   CRAN 0.1.0. With CRAN 0.1.0, set query limits after connecting using
+#'   [DBI::dbExecute()], or use a direct DuckDB connection for startup limits.
 #' @return A `duckdb_connection` (a `DBIConnection`). Close it with
 #'   [dp_disconnect()].
 #' @export
@@ -32,11 +42,23 @@ attach_sql <- function(con, source, alias) {
 #' DBI::dbGetQuery(con, 'SELECT * FROM "cms-medicare".physician_summary LIMIT 5')
 #' dp_disconnect(con)
 #' }
-dp_connect <- function(id, local = FALSE, quiet = FALSE) {
+dp_connect <- function(id, local = FALSE, quiet = FALSE,
+                       config = getOption("datapond.duckdb_config", list())) {
   stopifnot(is.character(id), length(id) >= 1L, !anyNA(id))
+  if (!is.list(config) || (length(config) > 0L &&
+      (is.null(names(config)) || anyNA(names(config)) ||
+       any(!nzchar(names(config))) || anyDuplicated(names(config))))) {
+    stop("config must be a named list of DuckDB settings.", call. = FALSE)
+  }
+  config <- lapply(config, function(value) {
+    if (!is.atomic(value) || length(value) != 1L || anyNA(value)) {
+      stop("config values must be non-missing scalars.", call. = FALSE)
+    }
+    as.character(value)
+  })
   entries <- lapply(id, dp_get_database)
 
-  con <- DBI::dbConnect(duckdb::duckdb(), dbdir = ":memory:")
+  con <- DBI::dbConnect(duckdb::duckdb(config = config), dbdir = ":memory:")
   ok <- FALSE
   on.exit(if (!ok) DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
